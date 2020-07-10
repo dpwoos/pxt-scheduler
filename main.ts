@@ -167,6 +167,36 @@ namespace scheduler {
     }
 
     /**
+     * Advance a counter on an interval
+     * @param n number of seconds, eg: 1
+     * @param start1 start value for outer counter, eg: 1
+     * @param end1 end value for outer counter, eg: 10
+     * @param start2 start value for inner counter, eg: 1
+     * @param end2 end value for inner counter, eg: 10
+     */
+    //% blockId=count_every2 block="every %n seconds count from %start1 to %end1 and %start2 to %end2" blockGap=8
+    //% blockAllowMultiple=1
+    //% draggableParameters
+    export function count_every2(n: number, start1: number, end1: number,
+      start2: number, end2: number,
+        f: (count1: number, count2: number) => void) {
+        let counter1 = start1
+        let counter2 = start2
+        let cb = function (_seconds: number) {
+            if (counter2 > end2) {
+                counter2 = start2
+                counter1++
+            }
+            if (counter1 > end1) {
+                counter1 = start1
+            }
+            f(counter1, counter2)
+            counter2++
+        }
+        do_every_offset(n, 0, cb)
+    }
+
+    /**
      * Run the scheduler loop
      */
     //% blockId=resume_scheduler block="resume scheduler"
@@ -222,9 +252,10 @@ namespace scheduler {
 
     /**
      * Run the timing event loop
+     * @param tick milliseconds per tick, eg: 1000
      */
-    //% blockId=event_loop block="run scheduler events"
-    export function event_loop() {
+    //% blockId=event_loop block="run scheduler events with tick every %tick milliseconds"
+    export function event_loop(tick: number) {
         debuglog(`event loop wake, clock is ${clock}, ${queue.nodes.length} events in PQ`)
         if (!running) {
             debuglog("queue not running")
@@ -239,7 +270,12 @@ namespace scheduler {
         }
         else if (next.when > clock) {
             debuglog(`going to wait for event at ${next.when}`)
-            let wait = next.when - clock
+            // this is a bit of a hack. 
+            // we're going to wait a number of "virtual microseconds" 
+            // depending on the tick value. 
+            // the default value of 1000 (i.e., a second is 1000 milliseconds) 
+            // will lead to real microseconds being equivalent to virtual microseconds.
+            let wait = (next.when - clock) * (tick / 1000)
             clock = next.when
             debuglog(`waiting ${wait} for next event`)
             control.waitMicros(wait)
